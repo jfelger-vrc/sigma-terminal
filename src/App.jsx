@@ -427,6 +427,7 @@ async function fetchTICData() {
 
     // Skip non-data rows
     if (!firstCell ||
+        firstCell.length > 40 || // Filter out footnote text rows
         firstCell.startsWith("Of Which") ||
         firstCell.startsWith("Notes") ||
         firstCell.startsWith("Holdings") ||
@@ -513,7 +514,7 @@ async function fetchTICData() {
       const bLatest = countryData[b][displayDates[displayDates.length - 1]] || 0;
       return bLatest - aLatest;
     })
-    .slice(0, 31); // Top 31 countries
+    .slice(0, 20); // Top 20 countries
 
   sortedCountryNames.forEach(name => {
     countries[name] = {
