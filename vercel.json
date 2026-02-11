@@ -1,0 +1,9 @@
+{
+  "buildCommand": "vite build",
+  "outputDirectory": "dist",
+  "rewrites": [
+    { "source": "/api/fred", "destination": "/api/fred" },
+    { "source": "/api/fiscal/(.*)", "destination": "/api/fiscal/$1" },
+    { "source": "/api/tic/(.*)", "destination": "/api/tic/$1" }
+  ]
+}
