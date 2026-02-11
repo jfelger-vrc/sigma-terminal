@@ -306,6 +306,7 @@ async function fetchTICData() {
   const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   const countryData = {};   // { "Japan": { "2024-12": 1061.5, ... }, ... }
   let grandTotalByDate = {};
+  const currentSourceCountries = new Set(); // Track countries in slt_table5.html
 
   // Helper to clean country names
   const cleanCountryName = (name) => {
@@ -451,6 +452,7 @@ async function fetchTICData() {
     }
 
     if (!countryData[country]) countryData[country] = {};
+    currentSourceCountries.add(country); // Track this country as present in current source
 
     for (let i = 1; i < cells.length && i - 1 < dateColumns.length; i++) {
       const val = parseFloat(cells[i].textContent.trim().replace(/,/g, ""));
@@ -460,7 +462,14 @@ async function fetchTICData() {
     }
   }
 
-  console.log("TIC: parsed current slt_table5.html");
+  console.log(`TIC: parsed current slt_table5.html (${currentSourceCountries.size} countries)`);
+
+  // Filter to only countries present in current source (avoid stale-only holders showing as zero)
+  for (const country of Object.keys(countryData)) {
+    if (!currentSourceCountries.has(country)) {
+      delete countryData[country];
+    }
+  }
 
   // --- 3. Build display dates: quarterly for old, monthly for last 18 months ---
   const allDates = [...new Set([
