@@ -303,98 +303,181 @@ async function fetchMTSData() {
 
 // ─── TIC MAJOR FOREIGN HOLDERS ──────────────────────────────────────────────
 async function fetchTICData() {
-  const res = await fetch(`${TIC_PROXY}/Publish/mfhhis01.txt`);
-  if (!res.ok) throw new Error(`TIC ${res.status}`);
-  const text = await res.text();
-
-  const lines = text.split("\n");
   const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-
-  // Parse all year blocks
-  const allDates = [];      // ["2024-12", "2024-11", ...]
   const countryData = {};   // { "Japan": { "2024-12": 1061.5, ... }, ... }
   let grandTotalByDate = {};
 
-  let i = 0;
-  while (i < lines.length) {
-    const line = lines[i].replace(/\r/, "");
+  // Helper to clean country names
+  const cleanCountryName = (name) => {
+    let country = name.replace(/"/g, "").trim();
+    if (country === "China, Mainland") return "China";
+    if (country === "Korea, South") return "South Korea";
+    return country;
+  };
 
-    // Look for month header rows (e.g., "\tDec\tNov\tOct...")
-    const monthMatch = line.match(/^\t+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\t/);
-    if (monthMatch) {
-      const months = line.split("\t").filter(s => s.trim());
+  // --- 1. Fetch HISTORICAL data (mfhhis01.txt) ---
+  try {
+    const res = await fetch(`${TIC_PROXY}/Publish/mfhhis01.txt`);
+    if (res.ok) {
+      const text = await res.text();
+      const lines = text.split("\n");
 
-      // Next line has "Country" and years
-      i++;
-      if (i >= lines.length) break;
-      const yearLine = lines[i].replace(/\r/, "");
-      const yearParts = yearLine.split("\t").filter(s => s.trim());
-      // yearParts[0] = "Country", rest = year values
-      const years = yearParts.slice(1);
-
-      // Build date columns
-      const dateCols = months.map((m, j) => {
-        const yr = years[j] || years[0];
-        const mi = MONTH_NAMES.indexOf(m);
-        if (mi === -1 || !yr) return null;
-        return `${yr}-${String(mi + 1).padStart(2, "0")}`;
-      });
-
-      // Skip dashes line
-      i++;
-      if (i < lines.length && lines[i].includes("------")) i++;
-
-      // Parse country rows until we hit empty line, "Of which:", or another block
+      let i = 0;
       while (i < lines.length) {
-        const row = lines[i].replace(/\r/, "");
-        if (!row.trim() || row.trim().startsWith("Of which:")) break;
+        const line = lines[i].replace(/\r/, "");
 
-        // Check for next year block
-        if (/^\t+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\t/.test(row)) break;
+        // Look for month header rows (e.g., "\tDec\tNov\tOct...")
+        const monthMatch = line.match(/^\t+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\t/);
+        if (monthMatch) {
+          const months = line.split("\t").filter(s => s.trim());
 
-        const parts = row.split("\t");
-        let country = parts[0].replace(/"/g, "").trim();
-        if (!country) { i++; continue; }
+          // Next line has "Country" and years
+          i++;
+          if (i >= lines.length) break;
+          const yearLine = lines[i].replace(/\r/, "");
+          const yearParts = yearLine.split("\t").filter(s => s.trim());
+          const years = yearParts.slice(1);
 
-        // Clean up country names
-        if (country === "China, Mainland") country = "China";
-
-        const values = parts.slice(1).map(v => {
-          const cleaned = v.trim().replace(/,/g, "");
-          if (!cleaned || cleaned === "null" || cleaned === "*") return 0;
-          const n = parseFloat(cleaned);
-          return isNaN(n) ? 0 : n;
-        });
-
-        if (country === "Grand Total") {
-          dateCols.forEach((d, j) => {
-            if (d && values[j]) grandTotalByDate[d] = values[j];
+          // Build date columns
+          const dateCols = months.map((m, j) => {
+            const yr = years[j] || years[0];
+            const mi = MONTH_NAMES.indexOf(m);
+            if (mi === -1 || !yr) return null;
+            return `${yr}-${String(mi + 1).padStart(2, "0")}`;
           });
-        } else {
-          if (!countryData[country]) countryData[country] = {};
-          dateCols.forEach((d, j) => {
-            if (d && values[j] > 0) {
-              countryData[country][d] = values[j];
-              if (!allDates.includes(d)) allDates.push(d);
+
+          // Skip dashes line
+          i++;
+          if (i < lines.length && lines[i].includes("------")) i++;
+
+          // Parse country rows until we hit empty line, "Of which:", or another block
+          while (i < lines.length) {
+            const row = lines[i].replace(/\r/, "");
+            if (!row.trim() || row.trim().startsWith("Of which:")) break;
+            if (/^\t+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\t/.test(row)) break;
+
+            const parts = row.split("\t");
+            let country = cleanCountryName(parts[0]);
+            if (!country) { i++; continue; }
+
+            const values = parts.slice(1).map(v => {
+              const cleaned = v.trim().replace(/,/g, "");
+              if (!cleaned || cleaned === "null" || cleaned === "*") return 0;
+              const n = parseFloat(cleaned);
+              return isNaN(n) ? 0 : n;
+            });
+
+            if (country === "Grand Total") {
+              dateCols.forEach((d, j) => {
+                if (d && values[j]) grandTotalByDate[d] = values[j];
+              });
+            } else {
+              if (!countryData[country]) countryData[country] = {};
+              dateCols.forEach((d, j) => {
+                if (d && values[j] > 0) {
+                  countryData[country][d] = values[j];
+                }
+              });
             }
-          });
+            i++;
+          }
+        } else {
+          i++;
         }
-        i++;
       }
-    } else {
-      i++;
+      console.log("TIC: parsed historical mfhhis01.txt");
+    }
+  } catch (e) {
+    console.warn("TIC: historical fetch failed, continuing with current source", e);
+  }
+
+  // --- 2. Fetch CURRENT data (slt_table5.html) - overwrites overlapping dates ---
+  const currentRes = await fetch(`${TIC_PROXY}/resource-center/data-chart-center/tic/Documents/slt_table5.html`);
+  if (!currentRes.ok) throw new Error(`TIC current ${currentRes.status}`);
+  const html = await currentRes.text();
+
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(html, "text/html");
+  const table = doc.querySelector("table");
+  if (!table) throw new Error("TIC: no table found in slt_table5.html");
+
+  const rows = table.querySelectorAll("tr");
+  let dateColumns = []; // ["2025-11", "2025-10", ...]
+
+  for (const row of rows) {
+    const cells = row.querySelectorAll("td, th");
+    if (cells.length === 0) continue;
+
+    const firstCell = cells[0].textContent.trim();
+
+    // Skip non-data rows
+    if (!firstCell ||
+        firstCell.startsWith("Of Which") ||
+        firstCell.startsWith("Notes") ||
+        firstCell.startsWith("Holdings") ||
+        firstCell.startsWith("Billions") ||
+        firstCell.startsWith("Link:") ||
+        firstCell === "Country") continue;
+
+    // Check if this is the header row with dates
+    const dateMatch = firstCell.match(/^(\d{4})-(\d{2})$/);
+    if (dateMatch || cells[1]?.textContent.trim().match(/^\d{4}-\d{2}$/)) {
+      // This row contains date headers
+      dateColumns = [];
+      for (let i = 0; i < cells.length; i++) {
+        const cellText = cells[i].textContent.trim();
+        if (cellText.match(/^\d{4}-\d{2}$/)) {
+          dateColumns.push(cellText);
+        }
+      }
+      continue;
+    }
+
+    // Skip if we don't have date columns yet
+    if (dateColumns.length === 0) continue;
+
+    // This is a country data row
+    let country = cleanCountryName(firstCell);
+    if (!country || country === "Grand Total") {
+      if (country === "Grand Total") {
+        for (let i = 1; i < cells.length && i - 1 < dateColumns.length; i++) {
+          const val = parseFloat(cells[i].textContent.trim().replace(/,/g, ""));
+          if (!isNaN(val) && val > 0) {
+            grandTotalByDate[dateColumns[i - 1]] = val;
+          }
+        }
+      }
+      continue;
+    }
+
+    if (!countryData[country]) countryData[country] = {};
+
+    for (let i = 1; i < cells.length && i - 1 < dateColumns.length; i++) {
+      const val = parseFloat(cells[i].textContent.trim().replace(/,/g, ""));
+      if (!isNaN(val) && val > 0) {
+        countryData[country][dateColumns[i - 1]] = val; // Overwrites historical
+      }
     }
   }
 
-  // Sort dates chronologically
-  allDates.sort();
+  console.log("TIC: parsed current slt_table5.html");
 
-  // Filter to ~3 years of quarterly data for the dashboard
-  const recentDates = allDates.filter(d => d >= "2022-01");
-  // Take every 3rd month (quarterly) to avoid overcrowding, or all if <=16
-  const displayDates = recentDates.length > 16
-    ? recentDates.filter((_, idx) => idx % 3 === 0 || idx === recentDates.length - 1)
-    : recentDates;
+  // --- 3. Build display dates: quarterly for old, monthly for last 18 months ---
+  const allDates = [...new Set([
+    ...Object.values(countryData).flatMap(c => Object.keys(c)),
+    ...Object.keys(grandTotalByDate)
+  ])].sort();
+
+  const now = new Date();
+  const cutoffDate = new Date(now.getFullYear(), now.getMonth() - 18, 1);
+  const cutoffStr = `${cutoffDate.getFullYear()}-${String(cutoffDate.getMonth() + 1).padStart(2, "0")}`;
+
+  const displayDates = allDates.filter(d => {
+    if (d >= cutoffStr) return true; // Monthly for last 18 months
+    // Quarterly (Mar, Jun, Sep, Dec) for older data
+    const month = parseInt(d.split("-")[1], 10);
+    return [3, 6, 9, 12].includes(month);
+  }).filter(d => d >= "2020-01");
 
   // Country colors (stable assignment)
   const COUNTRY_COLORS = {
@@ -403,7 +486,7 @@ async function fetchTICData() {
     Belgium: "#f472b6", Ireland: "#a78bfa", Switzerland: "#fbbf24",
     Taiwan: "#6ee7b7", India: "#fb923c", "Hong Kong": "#e879f9",
     Brazil: "#34d399", Singapore: "#93c5fd", France: "#c084fc",
-    Korea: "#7dd3fc", Norway: "#67e8f9", "Saudi Arabia": "#86efac",
+    Korea: "#7dd3fc", "South Korea": "#7dd3fc", Norway: "#67e8f9", "Saudi Arabia": "#86efac",
     Germany: "#fca5a5", Bermuda: "#d8b4fe", Thailand: "#bef264",
     Israel: "#a5b4fc", Philippines: "#fcd34d", Kuwait: "#5eead4",
     Mexico: "#f9a8d4", Australia: "#fdba74", "United Arab Emirates": "#99f6e4",
