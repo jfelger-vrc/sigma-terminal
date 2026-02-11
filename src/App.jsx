@@ -410,6 +410,20 @@ async function fetchTICData() {
 
     const firstCell = cells[0].textContent.trim();
 
+    // Check if this row contains date headers (must be BEFORE skip filters)
+    // The "Country" row has format: "Country", "2025-10", "2025-09", ...
+    if (cells[1]?.textContent.trim().match(/^\d{4}-\d{2}$/)) {
+      dateColumns = [];
+      for (let i = 1; i < cells.length; i++) {
+        const cellText = cells[i].textContent.trim();
+        if (cellText.match(/^\d{4}-\d{2}$/)) {
+          dateColumns.push(cellText);
+        }
+      }
+      console.log(`TIC: found ${dateColumns.length} date columns from slt_table5`);
+      continue;
+    }
+
     // Skip non-data rows
     if (!firstCell ||
         firstCell.startsWith("Of Which") ||
@@ -418,20 +432,6 @@ async function fetchTICData() {
         firstCell.startsWith("Billions") ||
         firstCell.startsWith("Link:") ||
         firstCell === "Country") continue;
-
-    // Check if this is the header row with dates
-    const dateMatch = firstCell.match(/^(\d{4})-(\d{2})$/);
-    if (dateMatch || cells[1]?.textContent.trim().match(/^\d{4}-\d{2}$/)) {
-      // This row contains date headers
-      dateColumns = [];
-      for (let i = 0; i < cells.length; i++) {
-        const cellText = cells[i].textContent.trim();
-        if (cellText.match(/^\d{4}-\d{2}$/)) {
-          dateColumns.push(cellText);
-        }
-      }
-      continue;
-    }
 
     // Skip if we don't have date columns yet
     if (dateColumns.length === 0) continue;
