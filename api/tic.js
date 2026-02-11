@@ -8,7 +8,7 @@ export default async function handler(req, res) {
     const data = await response.text();
 
     res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Cache-Control', 's-maxage=86400, stale-while-revalidate=172800');
+    res.setHeader('Cache-Control', 's-maxage=43200, stale-while-revalidate=3600');
     res.setHeader('Content-Type', 'text/plain');
     res.status(response.status).send(data);
   } catch (error) {
