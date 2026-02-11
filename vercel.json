@@ -3,7 +3,7 @@
   "outputDirectory": "dist",
   "rewrites": [
     { "source": "/api/fred", "destination": "/api/fred" },
-    { "source": "/api/fiscal/(.*)", "destination": "/api/fiscal/$1" },
-    { "source": "/api/tic/(.*)", "destination": "/api/tic/$1" }
+    { "source": "/api/fiscal/:path*", "destination": "/api/fiscal" },
+    { "source": "/api/tic/:path*", "destination": "/api/tic" }
   ]
 }

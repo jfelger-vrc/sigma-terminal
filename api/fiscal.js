@@ -1,7 +1,7 @@
 export default async function handler(req, res) {
   const url = new URL(req.url, `http://${req.headers.host}`);
   const path = url.pathname.replace(/^\/api\/fiscal/, '');
-  const fiscalUrl = `https://api.fiscaldata.treasury.gov${path}?${url.searchParams}`;
+  const fiscalUrl = `https://api.fiscaldata.treasury.gov${path}${url.search}`;
 
   try {
     const response = await fetch(fiscalUrl);
