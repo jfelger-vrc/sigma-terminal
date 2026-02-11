@@ -4135,9 +4135,10 @@ export default function App() {
               { name: "FRED API", keys: ["fed", "rates", "breakevens", "yieldCurve"] },
               { name: "Treasury FiscalData", keys: ["debt", "mts"] },
               { name: "TIC Reports", keys: ["tic"] },
-              { name: "SSA", keys: [] },
+              { name: "SSA", keys: [], alwaysLive: true },
             ].map((s, i) => {
-              const status = s.keys.length > 0
+              const status = s.alwaysLive ? "live"
+                : s.keys.length > 0
                 ? s.keys.some(k => loadingStatus[k] === "live") ? "live"
                   : s.keys.some(k => loadingStatus[k] === "loading") ? "loading"
                   : s.keys.some(k => loadingStatus[k] === "error") ? "error"
